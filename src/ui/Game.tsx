@@ -1,34 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { chooseAction } from '../ai/bot';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
-import { applyAction, canTakePileAtAll, currentMinimum } from '../engine/game';
+import { canTakePileAtAll, currentMinimum } from '../engine/game';
 import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
 import type { Action, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
-import { recordResult, saveGame } from '../storage';
 import { CardView } from './CardView';
 
 interface Props {
-  initial: GameState;
-  fast: boolean;
+  /** Spielstand aus Sicht des Spielers auf Platz 0. */
+  game: GameState;
+  /** Führt eine Aktion aus und liefert eine Fehlermeldung oder null. */
+  act: (a: Action) => string | null | Promise<string | null>;
   onExit: () => void;
-  onNewGame: () => void;
+  onNewGame?: () => void;
+  /** Kurzer Hinweis von außen (z. B. Verbindungsmeldungen im Online-Spiel). */
+  notice?: { text: string } | null;
 }
 
 const HUMAN = 0;
 
 export function teamName(s: GameState, team: number): string {
-  if (s.mode === 2) return s.players[team].name;
-  return team === 0 ? 'Ihr' : 'Gegner';
+  if (s.mode === 2) return s.players.find((p) => p.team === team)!.name;
+  return team === s.players[HUMAN].team ? 'Ihr' : 'Gegner';
 }
 
-export function Game({ initial, fast, onExit, onNewGame }: Props) {
-  const [game, setGame] = useState(initial);
+export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
   const [selected, setSelected] = useState<number[]>([]);
   const [staged, setStaged] = useState<MeldGroup[]>([]);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [fresh, setFresh] = useState<Set<number>>(new Set());
   const msgTimer = useRef<number>();
+  const prevGame = useRef(game);
 
   const me = game.players[HUMAN];
   const myTurn = game.current === HUMAN && (game.phase === 'draw' || game.phase === 'play');
@@ -42,42 +44,31 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
     msgTimer.current = window.setTimeout(() => setMessage(null), error ? 3500 : 2500);
   }
 
-  function commit(next: GameState) {
-    const before = new Set(game.players[HUMAN].hand.map((c) => c.id));
-    const added = next.players[HUMAN].hand.filter((c) => !before.has(c.id)).map((c) => c.id);
-    if (added.length > 0 && next.round === game.round) {
-      setFresh(new Set(added));
-      window.setTimeout(() => setFresh(new Set()), 2500);
-    }
-    if (next.phase === 'gameOver' && game.phase !== 'gameOver') {
-      recordResult(next.mode, next.players[1].difficulty, next.winner === me.team);
-    }
-    setGame(next);
-    saveGame(next.phase === 'gameOver' ? null : next);
-  }
+  useEffect(() => {
+    if (notice) flash(notice.text);
+  }, [notice]);
 
-  function act(a: Action): boolean {
-    const r = applyAction(game, a);
-    if (!r.ok) {
-      flash(r.error, true);
+  // Neu aufgenommene Karten kurz hervorheben.
+  useEffect(() => {
+    const prev = prevGame.current;
+    prevGame.current = game;
+    if (prev === game || prev.round !== game.round) return;
+    const before = new Set(prev.players[HUMAN].hand.map((c) => c.id));
+    const added = game.players[HUMAN].hand.filter((c) => !before.has(c.id)).map((c) => c.id);
+    if (added.length === 0) return;
+    setFresh(new Set(added));
+    const t = window.setTimeout(() => setFresh(new Set()), 2500);
+    return () => window.clearTimeout(t);
+  }, [game]);
+
+  async function act(a: Action): Promise<boolean> {
+    const error = await perform(a);
+    if (error) {
+      flash(error, true);
       return false;
     }
-    commit(r.state);
     return true;
   }
-
-  // Bots spielen mit kurzer Pause, damit man ihre Züge verfolgen kann.
-  useEffect(() => {
-    if (game.phase !== 'draw' && game.phase !== 'play') return;
-    if (game.players[game.current].isHuman) return;
-    const delay = (fast ? 0.35 : 1) * (game.phase === 'draw' ? 700 : 850);
-    const t = window.setTimeout(() => {
-      const r = applyAction(game, chooseAction(game));
-      if (r.ok) commit(r.state);
-    }, delay);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, fast]);
 
   useEffect(() => {
     if (game.phase === 'roundOver' || game.phase === 'gameOver' || game.current !== HUMAN) {
@@ -91,25 +82,25 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
     setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
   };
 
-  const onStock = () => {
+  const onStock = async () => {
     if (!myTurn) return;
     if (game.phase !== 'draw') return flash('Du hast schon gezogen.', true);
     act({ type: 'drawStock' });
   };
 
-  const onPile = () => {
+  const onPile = async () => {
     if (!myTurn) return;
     if (game.phase !== 'draw') return flash('Du hast schon gezogen.', true);
-    if (act({ type: 'takePile', withCards: selected, extraMelds: staged })) {
+    if (await act({ type: 'takePile', withCards: selected, extraMelds: staged })) {
       setSelected([]);
       setStaged([]);
     }
   };
 
-  const onMeld = () => {
+  const onMeld = async () => {
     const groups = [...staged, ...(selected.length > 0 ? [{ cardIds: selected }] : [])];
     if (groups.length === 0) return flash('Wähle zuerst Karten aus.', true);
-    if (act({ type: 'meld', groups })) {
+    if (await act({ type: 'meld', groups })) {
       setSelected([]);
       setStaged([]);
     }
@@ -121,15 +112,15 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
     setSelected([]);
   };
 
-  const onMeldClick = (m: Meld) => {
+  const onMeldClick = async (m: Meld) => {
     if (!myTurn || game.phase !== 'play' || selected.length === 0) return;
-    if (act({ type: 'meld', groups: [{ cardIds: selected, target: m.rank }] })) setSelected([]);
+    if (await act({ type: 'meld', groups: [{ cardIds: selected, target: m.rank }] })) setSelected([]);
   };
 
-  const onDiscard = () => {
+  const onDiscard = async () => {
     if (selected.length !== 1) return flash('Wähle genau eine Karte zum Abwerfen.', true);
     if (staged.length > 0) return flash('Lege die vorgemerkten Karten zuerst aus oder nimm sie zurück.', true);
-    if (act({ type: 'discard', cardId: selected[0] })) setSelected([]);
+    if (await act({ type: 'discard', cardId: selected[0] })) setSelected([]);
   };
 
   const selCards = me.hand.filter((c) => selected.includes(c.id));
@@ -177,7 +168,7 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
             <span className="theirs">
               {teamName(game, oppTeam)} {game.teams[oppTeam].score}
             </span>
-            <span className="diff">{DIFFICULTY_LABEL[game.players[1].difficulty]}</span>
+            <span className="diff">{botLabel(game)}</span>
           </div>
         </div>
 
@@ -307,6 +298,11 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
 
 const FACES = ['🙂', '👩🏼', '🧔🏻', '👨🏽'];
 
+function botLabel(game: GameState): string {
+  const bot = game.players.find((p) => !p.isHuman);
+  return bot ? DIFFICULTY_LABEL[bot.difficulty] : 'Online';
+}
+
 function Avatar({ game, pi }: { game: GameState; pi: number }) {
   const p = game.players[pi];
   const ally = p.team === game.players[HUMAN].team;
@@ -343,7 +339,7 @@ function MeldBoard({
   const t = game.teams[team];
   const own = team === game.players[HUMAN].team;
   const melds = [...t.melds].sort((a, b) => b.cards.length - a.cards.length || b.rank - a.rank);
-  const label = own ? (game.mode === 4 ? 'Unsere Punkte' : 'Deine Punkte') : game.mode === 4 ? 'Gegner Punkte' : `${game.players[team].name}s Punkte`;
+  const label = own ? (game.mode === 4 ? 'Unsere Punkte' : 'Deine Punkte') : game.mode === 4 ? 'Gegner Punkte' : `Punkte ${teamName(game, team)}`;
   return (
     <section className={`board ${own ? 'own' : 'opp'} ${clickable ? 'droppable' : ''}`} onClick={onBoardClick}>
       <div className="board-label">
@@ -410,7 +406,7 @@ function RoundSummary({
 }: {
   game: GameState;
   onNext: () => void;
-  onNewGame: () => void;
+  onNewGame?: () => void;
   onExit: () => void;
 }) {
   const r = game.lastRound!;
@@ -474,7 +470,7 @@ function RoundSummary({
         <div className="modal-buttons">
           {over ? (
             <>
-              <button onClick={onNewGame}>Neues Spiel</button>
+              {onNewGame && <button onClick={onNewGame}>Neues Spiel</button>}
               <button className="ghost" onClick={onExit}>
                 Menü
               </button>

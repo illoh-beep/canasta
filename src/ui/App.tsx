@@ -2,14 +2,25 @@ import { useState } from 'react';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { newGame } from '../engine/game';
 import type { Difficulty, GameState, Mode } from '../engine/types';
-import { loadGame, loadSettings, loadStats, saveGame, saveSettings, type Settings } from '../storage';
+import { loadGame, loadSettings, loadStats, recordResult, saveGame, saveSettings, type Settings } from '../storage';
 import { Game } from './Game';
+import { Online } from './Online';
+import { useEngine } from './useEngine';
 import { Rules } from './Rules';
 
-type Screen = 'menu' | 'game' | 'rules';
+type Screen = 'menu' | 'game' | 'rules' | 'online';
+
+const initialJoin = new URLSearchParams(location.search).get('join');
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>('menu');
+  const [screen, setScreen] = useState<Screen>(initialJoin ? 'online' : 'menu');
+  const [joinCode, setJoinCode] = useState(initialJoin);
+
+  const leaveOnline = () => {
+    setJoinCode(null);
+    history.replaceState(null, '', location.pathname);
+    setScreen('menu');
+  };
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [game, setGame] = useState<GameState | null>(loadGame);
   const [gameKey, setGameKey] = useState(0);
@@ -30,7 +41,7 @@ export function App() {
 
   if (screen === 'game' && game) {
     return (
-      <Game
+      <LocalGame
         key={gameKey}
         initial={game}
         fast={settings.fast}
@@ -42,6 +53,7 @@ export function App() {
       />
     );
   }
+  if (screen === 'online') return <Online settings={settings} joinCode={joinCode} onExit={leaveOnline} />;
   if (screen === 'rules') return <Rules onBack={() => setScreen('menu')} />;
 
   const stats = loadStats();
@@ -104,6 +116,11 @@ export function App() {
         </button>
       </div>
 
+      <button className="big online" onClick={() => setScreen('online')}>
+        🌐 Online mit Freunden
+        <small>Spiel per Code teilen oder beitreten</small>
+      </button>
+
       <button className="ghost" onClick={() => setScreen('rules')}>
         Spielregeln
       </button>
@@ -122,4 +139,24 @@ export function App() {
       )}
     </div>
   );
+}
+
+function LocalGame({
+  initial,
+  fast,
+  onExit,
+  onNewGame,
+}: {
+  initial: GameState;
+  fast: boolean;
+  onExit: () => void;
+  onNewGame: () => void;
+}) {
+  const { game, act } = useEngine(initial, fast, (next, prev) => {
+    if (next.phase === 'gameOver' && prev.phase !== 'gameOver') {
+      recordResult(next.mode, next.players[1].difficulty, next.winner === next.players[0].team);
+    }
+    saveGame(next.phase === 'gameOver' ? null : next);
+  });
+  return <Game game={game} act={act} onExit={onExit} onNewGame={onNewGame} />;
 }

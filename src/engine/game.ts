@@ -47,6 +47,10 @@ export interface NewGameOptions {
   seed?: number;
   /** Alle Plätze von der KI spielen lassen (Simulation). */
   allBots?: boolean;
+  /** Online: Namen pro Platz. */
+  names?: string[];
+  /** Online: welche Plätze von Menschen gespielt werden (Rest: KI). */
+  humans?: boolean[];
   /** Schwierigkeit pro Platz, überschreibt difficulty (Simulation). */
   seatDifficulties?: Difficulty[];
   targetScore?: number;
@@ -58,14 +62,14 @@ const LOG_LIMIT = 60;
 
 export function newGame(opts: NewGameOptions): GameState {
   const n = opts.mode;
-  const names = n === 4 ? NAMES_4 : NAMES_2;
+  const names = opts.names ?? (n === 4 ? NAMES_4 : NAMES_2);
   const players: Player[] = names.map((name, i) => {
     const isPartner = n === 4 && i === 2;
     return {
       name,
       team: i % 2,
       hand: [],
-      isHuman: i === 0 && !opts.allBots,
+      isHuman: opts.humans ? opts.humans[i] : i === 0 && !opts.allBots,
       difficulty: opts.seatDifficulties?.[i] ?? (isPartner ? opts.partnerDifficulty ?? opts.difficulty : opts.difficulty),
     };
   });
@@ -125,7 +129,7 @@ function startRound(prev: GameState, first = false): GameState {
   for (let k = 0; k < size; k++) {
     for (let i = 0; i < n; i++) s.players[(s.current + i) % n].hand.push(s.stock.pop()!);
   }
-  log(s, `Runde ${s.round} beginnt. ${s.players[s.current].name} ${s.current === 0 && s.players[0].isHuman ? 'beginnst' : 'beginnt'}.`);
+  log(s, `Runde ${s.round} beginnt. ${s.players[s.current].name} ${s.players[s.current].name === 'Du' ? 'beginnst' : 'beginnt'}.`);
 
   // Rote Dreien werden sofort ausgelegt und ersetzt.
   for (let i = 0; i < n; i++) {
@@ -211,7 +215,7 @@ export function applyAction(state: GameState, action: Action): Result {
         log(s, 'Der Stock ist aufgebraucht.');
         return { ok: true, state: endRound(s, null) };
       }
-      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'ziehst' : 'zieht'} eine Karte.`);
+      log(s, `${player.name} ${player.name === 'Du' ? 'ziehst' : 'zieht'} eine Karte.`);
       s.phase = 'play';
       return { ok: true, state: s };
     }
@@ -274,7 +278,7 @@ export function applyAction(state: GameState, action: Action): Result {
       s.pileFrozen = false;
       s.events.push({ kind: 'takePile', player: pi, cards: restCards });
       s.events.push({ kind: 'meld', player: pi, cards: res.placed });
-      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'nimmst' : 'nimmt'} den Stapel (${rest.length + 1} Karten).`);
+      log(s, `${player.name} ${player.name === 'Du' ? 'nimmst' : 'nimmt'} den Stapel (${rest.length + 1} Karten).`);
       s.phase = 'play';
       if (newHand.length === 0) return { ok: true, state: endRound(s, pi) };
       return { ok: true, state: s };
@@ -304,7 +308,7 @@ export function applyAction(state: GameState, action: Action): Result {
       team.melds = res.melds;
       player.hand = res.hand;
       s.events.push({ kind: 'meld', player: pi, cards: res.placed });
-      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'legst' : 'legt'} ${res.placed.length} Karten aus.`);
+      log(s, `${player.name} ${player.name === 'Du' ? 'legst' : 'legt'} ${res.placed.length} Karten aus.`);
       if (player.hand.length === 0) return { ok: true, state: endRound(s, pi) };
       return { ok: true, state: s };
     }
@@ -318,7 +322,7 @@ export function applyAction(state: GameState, action: Action): Result {
       s.discard.push(card);
       if (isWild(card)) s.pileFrozen = true;
       s.events.push({ kind: 'discard', player: pi, card });
-      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'wirfst' : 'wirft'} ${cardLabel(card)} ab.${isWild(card) ? ' Der Stapel ist eingefroren.' : ''}`);
+      log(s, `${player.name} ${player.name === 'Du' ? 'wirfst' : 'wirft'} ${cardLabel(card)} ab.${isWild(card) ? ' Der Stapel ist eingefroren.' : ''}`);
       if (player.hand.length === 0) return { ok: true, state: endRound(s, pi) };
       s.current = (pi + 1) % s.players.length;
       beginTurn(s);

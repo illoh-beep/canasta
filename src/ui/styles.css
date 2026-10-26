@@ -854,3 +854,95 @@ button.big small {
   justify-content: flex-end;
   margin-top: 10px;
 }
+
+/* ---------------------------------------------------------------- Online */
+
+.menu .small-title {
+  font-size: 34px;
+}
+button.big.online {
+  color: var(--ink);
+  background: linear-gradient(180deg, #4a7fd0, var(--ally));
+  box-shadow: 0 3px 0 #1c3a6b, 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+input.text {
+  font: inherit;
+  font-weight: 700;
+  font-size: 17px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  background: var(--card);
+  color: #222;
+  width: 100%;
+}
+input.text.code {
+  text-align: center;
+  letter-spacing: 0.4em;
+  font-size: 24px;
+  text-transform: uppercase;
+}
+.room-code {
+  text-align: center;
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  color: var(--gold);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  user-select: all;
+}
+.hint {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0;
+  line-height: 1.4;
+}
+.center-text {
+  text-align: center;
+}
+.error-box {
+  background: rgba(120, 0, 0, 0.55);
+  border: 2px solid var(--danger);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 700;
+  text-align: center;
+}
+.seats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.seat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-left: 5px solid var(--ally);
+  background: rgba(0, 0, 0, 0.2);
+}
+.seat-row.team-b {
+  border-left-color: var(--enemy);
+}
+.seat-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.seat-name {
+  font-weight: 800;
+}
+.seat-name.you {
+  color: var(--gold);
+}
+.seat-select {
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: none;
+  max-width: 60%;
+}
