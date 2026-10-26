@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
 import { canTakePileAtAll, currentMinimum } from '../engine/game';
-import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
+import { hasMelded, initialMeldMinimum, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
 import type { Action, Card, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
 import { AvatarFace, BOT_AVATARS } from './avatar';
 import { CardView } from './CardView';
@@ -377,6 +377,13 @@ function MeldBoard({
     <section className={`board ${own ? 'own' : 'opp'} ${clickable ? 'droppable' : ''}`} onClick={onBoardClick}>
       <div className="board-label">
         {label}: {boardPoints(t)} Pkt.
+        {t.melds.length === 0 ? (
+          <span className="out-need" title="Mindestwert der ersten Auslage">
+            Raus mit {initialMeldMinimum(t.score)}
+          </span>
+        ) : (
+          <span className="out-done">✓ draußen</span>
+        )}
       </div>
       <div className="board-melds">
         {melds.map((m) => (
