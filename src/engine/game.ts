@@ -169,10 +169,7 @@ function canGoOut(s: GameState, melds: Meld[]): boolean {
 }
 
 function goOutError(s: GameState): string {
-  const need = requiredCanastas(s.mode);
-  return need === 1
-    ? 'Zum Ausmachen braucht ihr mindestens einen Canasta.'
-    : 'Zum Ausmachen brauchst du mindestens zwei Canastas.';
+  return s.mode === 4 ? 'Zum Ausmachen braucht ihr mindestens einen Canasta.' : 'Zum Ausmachen brauchst du mindestens einen Canasta.';
 }
 
 /** Zieht eine Karte vom Stock; rote Dreien werden ausgelegt und ersetzt. Gibt null zurück, wenn der Stock leer ist. */
@@ -210,14 +207,11 @@ export function applyAction(state: GameState, action: Action): Result {
   switch (action.type) {
     case 'drawStock': {
       if (s.phase !== 'draw') return { ok: false, error: 'Du hast schon gezogen.' };
-      const count = s.mode === 2 ? 2 : 1;
-      let drawn = 0;
-      for (let i = 0; i < count; i++) if (drawOne(s, pi)) drawn++;
-      if (drawn === 0) {
+      if (!drawOne(s, pi)) {
         log(s, 'Der Stock ist aufgebraucht.');
         return { ok: true, state: endRound(s, null) };
       }
-      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'ziehst' : 'zieht'} ${drawn === 1 ? 'eine Karte' : `${drawn} Karten`}.`);
+      log(s, `${player.name} ${pi === 0 && player.isHuman ? 'ziehst' : 'zieht'} eine Karte.`);
       s.phase = 'play';
       return { ok: true, state: s };
     }

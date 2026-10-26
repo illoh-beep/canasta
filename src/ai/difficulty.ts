@@ -21,8 +21,10 @@ export interface Profile {
   safeDiscards: boolean;
   /** Friert einen großen Stapel gezielt mit einer Wildcard ein. */
   freezes: boolean;
-  /** Zählt Karten und schätzt per Wahrscheinlichkeit, ob der Gegner einen Abwurf verwenden kann. */
-  countsCards: boolean;
+  /** Zählt Karten und schätzt per Wahrscheinlichkeit, ob der Gegner einen Abwurf verwenden kann (je Spielerzahl). */
+  countsCards: Record<Mode, boolean>;
+  /** Behält Drillinge auf der Hand (für das Stapelnehmen), solange die Hand höchstens so groß ist (je Spielerzahl). */
+  holdTriples: Record<Mode, number | null>;
 }
 
 export const PROFILES: Record<Difficulty, Profile> = {
@@ -37,7 +39,8 @@ export const PROFILES: Record<Difficulty, Profile> = {
     wastesWilds: true,
     safeDiscards: false,
     freezes: false,
-    countsCards: false,
+    countsCards: { 2: false, 4: false },
+    holdTriples: { 2: null, 4: null },
   },
   medium: {
     discardMistake: 0.12,
@@ -50,13 +53,14 @@ export const PROFILES: Record<Difficulty, Profile> = {
     wastesWilds: false,
     safeDiscards: true,
     freezes: false,
-    countsCards: false,
+    countsCards: { 2: false, 4: false },
+    holdTriples: { 2: null, 4: null },
   },
   hard: {
     discardMistake: 0,
     memory: Infinity,
-    // Per Bot-Simulation abgestimmt: im Zweierspiel lohnen erst größere Stapel.
-    minPile: { 2: 6, 4: 3 },
+    // Per Bot-Simulation abgestimmt.
+    minPile: { 2: 4, 4: 3 },
     minPileForWild: { 2: 7, 4: 4 },
     missPile: 0,
     missLayoff: 0,
@@ -64,7 +68,8 @@ export const PROFILES: Record<Difficulty, Profile> = {
     wastesWilds: false,
     safeDiscards: true,
     freezes: true,
-    countsCards: true,
+    countsCards: { 2: false, 4: true },
+    holdTriples: { 2: 9, 4: null },
   },
 };
 

@@ -3,8 +3,8 @@ import { chooseAction } from '../ai/bot';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
 import { applyAction, canTakePileAtAll, currentMinimum } from '../engine/game';
-import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, requiredCanastas, topDiscard } from '../engine/rules';
-import type { Action, GameState, Meld, MeldGroup, TeamRoundScore } from '../engine/types';
+import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
+import type { Action, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
 import { recordResult, saveGame } from '../storage';
 import { CardView } from './CardView';
 
@@ -142,205 +142,247 @@ export function Game({ initial, fast, onExit, onNewGame }: Props) {
   let hint = '';
   if (game.phase === 'draw' || game.phase === 'play') {
     if (!myTurn) hint = `${game.players[game.current].name} ist am Zug …`;
-    else if (game.phase === 'draw') hint = 'Ziehe vom Stock – oder wähle passende Karten und tippe auf den Ablagestapel.';
-    else hint = 'Lege aus (Karten wählen → Auslegen oder auf eine eigene Meldung tippen) und wirf dann eine Karte ab.';
+    else if (game.phase === 'draw') hint = 'Tippe auf den Stock – oder wähle passende Karten und tippe auf den Ablagestapel.';
+    else hint = 'Karten wählen und auf dein Feld tippen zum Auslegen – eine Karte wählen und auf den Ablagestapel tippen zum Abwerfen.';
   }
 
+  const onBoardClick = () => {
+    if (myTurn && game.phase === 'play' && (selected.length > 0 || staged.length > 0)) onMeld();
+  };
+
+  // Im Auslegen-Teil des Zugs wirft ein Tipp auf den Ablagestapel die gewählte Karte ab.
+  const onPileTap = () => {
+    if (myTurn && game.phase === 'play' && selected.length === 1) return onDiscard();
+    onPile();
+  };
+
   const opponents = game.mode === 4 ? [1, 2, 3] : [1];
+  const oppTeam = 1 - me.team;
+  const status = message ?? (myTurn ? { text: hint, error: false } : null);
 
   return (
-    <div className={`game mode-${game.mode}`}>
-      <header className="topbar">
-        <button className="ghost" onClick={onExit}>
-          ☰ Menü
-        </button>
-        <div className="scores">
-          {game.teams.map((t, i) => (
-            <span key={i} className={i === me.team ? 'mine' : ''}>
-              {teamName(game, i)}: <b>{t.score}</b>
+    <div className={`table mode-${game.mode}`}>
+      <div className="felt">
+        <div className="felt-band" />
+
+        <div className="topleft">
+          <button className="round-btn" onClick={onExit} title="Menü">
+            ☰
+          </button>
+          <div className="scorechip">
+            <span>Runde {game.round}</span>
+            <span className="mine">
+              {teamName(game, me.team)} {myTeam.score}
             </span>
+            <span className="theirs">
+              {teamName(game, oppTeam)} {game.teams[oppTeam].score}
+            </span>
+            <span className="diff">{DIFFICULTY_LABEL[game.players[1].difficulty]}</span>
+          </div>
+        </div>
+
+        <div className="opponents">
+          {opponents.map((pi) => (
+            <Avatar key={pi} game={game} pi={pi} />
           ))}
         </div>
-        <span className="meta">
-          Runde {game.round} · {DIFFICULTY_LABEL[game.players[1].difficulty]}
-        </span>
-      </header>
 
-      <section className="seats">
-        {opponents.map((pi) => {
-          const p = game.players[pi];
-          const pos = game.mode === 2 ? 'top' : pi === 1 ? 'left' : pi === 2 ? 'top' : 'right';
-          return (
-            <div key={pi} className={`seat ${pos} ${game.current === pi ? 'active' : ''}`}>
-              <div className="seat-name">
-                {p.name}
-                {game.mode === 4 && pi === 2 ? ' (Partner)' : ''}
-              </div>
-              <div className="seat-cards">
-                {p.hand.slice(0, 12).map((c) => (
-                  <CardView key={c.id} faceDown small />
-                ))}
-              </div>
-              <div className="seat-count">{p.hand.length} Karten</div>
-            </div>
-          );
-        })}
-      </section>
-
-      <MeldRow game={game} team={1 - me.team} />
-
-      <section className="center">
-        <div className="pile-block">
-          <div className="pile stock" onClick={onStock}>
-            {game.stock.length > 0 ? <CardView faceDown className={myTurn && game.phase === 'draw' ? 'glow' : ''} /> : <div className="card empty" />}
-            <span className="pile-label">Stock {game.stock.length}</span>
-          </div>
-          <div className="pile discard" onClick={onPile}>
+        <div className="piles">
+          <div className={`pile discard ${myTurn && game.phase === 'play' && selected.length === 1 ? 'drop' : ''}`} onClick={onPileTap}>
             {top ? (
-              <CardView
-                card={top}
-                className={myTurn && game.phase === 'draw' && canTakePileAtAll(game) ? 'glow-soft' : ''}
-              />
+              <div className="pile-stack">
+                {game.discard.length > 1 && <CardView card={game.discard[game.discard.length - 2]} className="under" />}
+                <CardView card={top} className={myTurn && game.phase === 'draw' && canTakePileAtAll(game) ? 'glow-soft' : ''} />
+              </div>
             ) : (
               <div className="card empty" />
             )}
-            {game.pileFrozen && <span className="frozen" title="Eingefroren">❄</span>}
-            <span className="pile-label">Ablage {game.discard.length}</span>
+            {game.pileFrozen && (
+              <span className="frozen" title="Eingefroren">
+                ❄
+              </span>
+            )}
+            <span className="pile-count">{game.discard.length}</span>
+          </div>
+          <div className="pile stock" onClick={onStock}>
+            {game.stock.length > 0 ? (
+              <CardView faceDown className={myTurn && game.phase === 'draw' ? 'glow' : ''} />
+            ) : (
+              <div className="card empty" />
+            )}
+            <span className="stock-count">{game.stock.length}</span>
           </div>
         </div>
-        <div className="info">
-          {game.log.slice(-3).map((line, i, arr) => (
-            <div key={game.log.length - arr.length + i} className={i === arr.length - 1 ? 'lastlog' : 'oldlog'}>
-              {line}
-            </div>
-          ))}
-          {myTurn && game.phase === 'draw' && top && (
-            <div className="sub">
-              {!canTakePileAtAll(game)
-                ? 'Stapel gesperrt.'
-                : frozenForMe
-                  ? `Stapel eingefroren: zwei natürliche ${rankPlural(top.rank)} nötig.`
-                  : 'Stapel offen.'}
-            </div>
-          )}
-        </div>
-      </section>
 
-      <MeldRow game={game} team={me.team} onMeldClick={onMeldClick} clickable={myTurn && game.phase === 'play' && selected.length > 0} />
-
-      {staged.length > 0 && (
-        <section className="staged">
-          <span className="label">Vorgemerkt:</span>
-          {staged.map((g, i) => (
-            <div key={i} className="staged-group" onClick={() => setStaged((s) => s.filter((_, j) => j !== i))} title="Zurücknehmen">
-              {stagedCards
-                .filter((c) => g.cardIds.includes(c.id))
-                .map((c) => (
-                  <CardView key={c.id} card={c} small />
-                ))}
-              <span className="x">✕</span>
-            </div>
-          ))}
-        </section>
-      )}
-
-      <section className={`hand ${myTurn ? 'my-turn' : ''}`}>
-        {hand.map((c) => (
-          <CardView
-            key={c.id}
-            card={c}
-            selected={selected.includes(c.id)}
-            className={fresh.has(c.id) ? 'fresh' : ''}
-            onClick={() => toggle(c.id)}
+        <div className="boards">
+          <MeldBoard
+            game={game}
+            team={me.team}
+            onMeldClick={onMeldClick}
+            onBoardClick={onBoardClick}
+            clickable={myTurn && game.phase === 'play' && selected.length > 0}
           />
-        ))}
-      </section>
+          <MeldBoard game={game} team={oppTeam} />
+          <div className="ticker">
+            {status && <div className={`status ${status.error ? 'error' : ''}`}>{status.text}</div>}
+            {myTurn && (selected.length > 0 || staged.length > 0 || needsInitial) && (
+              <div className="value">
+                {[
+                  selected.length > 0 || staged.length > 0 ? `Auswahl ${sumValues([...selCards, ...stagedCards])} Pkt.` : '',
+                  needsInitial ? `Erstmeldung mind. ${minimum}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            )}
+            {game.log.slice(myTurn ? -1 : -2).map((line, i, arr) => (
+              <div key={game.log.length - arr.length + i} className={i === arr.length - 1 ? 'last' : 'old'}>
+                {line}
+              </div>
+            ))}
+            {myTurn && game.phase === 'draw' && top && (
+              <div className="old">
+                {!canTakePileAtAll(game)
+                  ? 'Stapel gesperrt.'
+                  : frozenForMe
+                    ? `Stapel eingefroren: zwei natürliche ${rankPlural(top.rank)} nötig.`
+                    : 'Stapel offen.'}
+              </div>
+            )}
+          </div>
+        </div>
 
-      <footer className="controls">
-        <div className="status">
-          {message ? <span className={message.error ? 'error' : 'ok'}>{message.text}</span> : <span>{hint}</span>}
-          {myTurn && (selected.length > 0 || staged.length > 0) && (
-            <span className="value">
-              Auswahl: {sumValues([...selCards, ...stagedCards])} Punkte
-              {needsInitial ? ` · Erstmeldung mind. ${minimum}` : ''}
-            </span>
-          )}
-          {myTurn && needsInitial && selected.length === 0 && staged.length === 0 && (
-            <span className="value">Erstmeldung mind. {minimum} Punkte</span>
-          )}
+        <div className="bottom">
+          <Avatar game={game} pi={HUMAN} />
+          <div className="hand-area">
+            {staged.length > 0 && (
+              <div className="staged">
+                {staged.map((g, i) => (
+                  <div key={i} className="staged-group" onClick={() => setStaged((s) => s.filter((_, j) => j !== i))} title="Zurücknehmen">
+                    {stagedCards
+                      .filter((c) => g.cardIds.includes(c.id))
+                      .map((c) => (
+                        <CardView key={c.id} card={c} small />
+                      ))}
+                    <span className="x">✕</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={`hand ${myTurn ? 'my-turn' : ''}`} style={{ '--n': Math.max(hand.length, 2) } as React.CSSProperties}>
+              {hand.map((c) => (
+                <CardView
+                  key={c.id}
+                  card={c}
+                  selected={selected.includes(c.id)}
+                  className={fresh.has(c.id) ? 'fresh' : ''}
+                  onClick={() => toggle(c.id)}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="actions">
+            <button disabled={!myTurn || game.phase !== 'play'} onClick={onMeld}>
+              Auslegen
+            </button>
+            <button className="alt" disabled={!myTurn || selected.length === 0} onClick={onStage} title="Mehrere Meldungen auf einmal auslegen (z. B. für die Erstmeldung)">
+              Vormerken
+            </button>
+            <button disabled={!myTurn || game.phase !== 'play'} onClick={onDiscard}>
+              Abwerfen
+            </button>
+            <button className="alt small" disabled={selected.length === 0} onClick={() => setSelected([])} title="Auswahl aufheben">
+              ✕ Abwählen
+            </button>
+          </div>
         </div>
-        <div className="buttons">
-          <button disabled={!myTurn || game.phase !== 'play'} onClick={onMeld}>
-            Auslegen
-          </button>
-          <button className="secondary" disabled={!myTurn || selected.length === 0} onClick={onStage} title="Mehrere Meldungen auf einmal auslegen (z. B. für die Erstmeldung)">
-            Vormerken
-          </button>
-          <button disabled={!myTurn || game.phase !== 'play'} onClick={onDiscard}>
-            Abwerfen
-          </button>
-          <button className="ghost narrow" disabled={selected.length === 0} onClick={() => setSelected([])} title="Auswahl aufheben">
-            ✕
-          </button>
-        </div>
-      </footer>
+      </div>
 
       {(game.phase === 'roundOver' || game.phase === 'gameOver') && game.lastRound && (
-        <RoundSummary
-          game={game}
-          onNext={() => act({ type: 'nextRound' })}
-          onNewGame={onNewGame}
-          onExit={onExit}
-        />
+        <RoundSummary game={game} onNext={() => act({ type: 'nextRound' })} onNewGame={onNewGame} onExit={onExit} />
       )}
     </div>
   );
 }
 
-function MeldRow({
+const FACES = ['🙂', '👩🏼', '🧔🏻', '👨🏽'];
+
+function Avatar({ game, pi }: { game: GameState; pi: number }) {
+  const p = game.players[pi];
+  const ally = p.team === game.players[HUMAN].team;
+  return (
+    <div className={`avatar ${game.current === pi && (game.phase === 'draw' || game.phase === 'play') ? 'active' : ''}`}>
+      <div className="face">{FACES[pi]}</div>
+      <div className={`ribbon ${ally ? 'ally' : 'enemy'}`}>{p.name}</div>
+      {pi !== HUMAN && <div className="count">{p.hand.length}</div>}
+    </div>
+  );
+}
+
+/** Punkte der Auslage, wie sie gerade auf dem Tisch liegen (ohne Handkarten und Ausmach-Bonus). */
+function boardPoints(t: TeamState): number {
+  const cards = t.melds.reduce((s, m) => s + sumValues(m.cards), 0);
+  const canastas = t.melds.reduce((s, m) => s + (isCanasta(m) ? (isNaturalCanasta(m) ? 500 : 300) : 0), 0);
+  const reds = t.redThrees.length === 4 ? 800 : t.redThrees.length * 100;
+  return cards + canastas + (canastas > 0 ? reds : -reds);
+}
+
+function MeldBoard({
   game,
   team,
   onMeldClick,
+  onBoardClick,
   clickable,
 }: {
   game: GameState;
   team: number;
   onMeldClick?: (m: Meld) => void;
+  onBoardClick?: () => void;
   clickable?: boolean;
 }) {
   const t = game.teams[team];
+  const own = team === game.players[HUMAN].team;
   const melds = [...t.melds].sort((a, b) => b.cards.length - a.cards.length || b.rank - a.rank);
-  const canastas = t.melds.filter(isCanasta).length;
+  const label = own ? (game.mode === 4 ? 'Unsere Punkte' : 'Deine Punkte') : game.mode === 4 ? 'Gegner Punkte' : `${game.players[team].name}s Punkte`;
   return (
-    <section className={`melds ${team === game.players[HUMAN].team ? 'own' : 'opp'}`}>
-      <div className="melds-head">
-        <span>{teamName(game, team)}</span>
-        <span className="canasta-count">
-          Canastas {canastas}/{requiredCanastas(game.mode)}
-        </span>
-        {t.redThrees.length > 0 && (
-          <span className="reds">
-            {t.redThrees.map((c) => (
-              <CardView key={c.id} card={c} small />
-            ))}
-          </span>
-        )}
+    <section className={`board ${own ? 'own' : 'opp'} ${clickable ? 'droppable' : ''}`} onClick={onBoardClick}>
+      <div className="board-label">
+        {label}: {boardPoints(t)} Pkt.
       </div>
-      <div className="melds-list">
-        {melds.length === 0 && <span className="empty-note">noch nichts ausgelegt</span>}
+      <div className="board-melds">
         {melds.map((m) => (
-          <MeldStack key={m.rank} meld={m} onClick={onMeldClick ? () => onMeldClick(m) : undefined} clickable={clickable} />
+          <MeldFan
+            key={m.rank}
+            meld={m}
+            clickable={clickable}
+            onClick={
+              onMeldClick
+                ? (e) => {
+                    e.stopPropagation();
+                    onMeldClick(m);
+                  }
+                : undefined
+            }
+          />
         ))}
+        {t.redThrees.length > 0 && (
+          <div className="meld reds">
+            <div className="meld-cards">
+              {t.redThrees.map((c) => (
+                <CardView key={c.id} card={c} small />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function MeldStack({ meld, onClick, clickable }: { meld: Meld; onClick?: () => void; clickable?: boolean }) {
+function MeldFan({ meld, onClick, clickable }: { meld: Meld; onClick?: (e: React.MouseEvent) => void; clickable?: boolean }) {
   const canasta = isCanasta(meld);
   const natural = isNaturalCanasta(meld);
   const cards = [...meld.cards].sort((a, b) => Number(isWild(a)) - Number(isWild(b)));
-  const shown = canasta ? cards.slice(0, 1) : cards;
   const wilds = meld.cards.filter(isWild).length;
   return (
     <div
@@ -349,14 +391,13 @@ function MeldStack({ meld, onClick, clickable }: { meld: Meld; onClick?: () => v
       title={`${rankPlural(meld.rank)}: ${meld.cards.length} Karten, ${wilds} Wildcards`}
     >
       <div className="meld-cards">
-        {shown.map((c) => (
-          <CardView key={c.id} card={c} small />
-        ))}
+        {canasta ? (
+          <CardView card={cards[0]} small className={natural ? 'canasta-red' : 'canasta-black'} />
+        ) : (
+          cards.map((c) => <CardView key={c.id} card={c} small />)
+        )}
       </div>
-      <span className="meld-badge">
-        {canasta ? (natural ? 'rein' : 'gemischt') : ''} {meld.cards.length}
-        {wilds > 0 && !canasta ? ` (${wilds}★)` : ''}
-      </span>
+      {canasta && <span className="meld-tag">{meld.cards.length}</span>}
     </div>
   );
 }

@@ -12,8 +12,8 @@ export function initialMeldMinimum(score: number): number {
   return 120;
 }
 
-export function requiredCanastas(mode: Mode): number {
-  return mode === 2 ? 2 : 1;
+export function requiredCanastas(_mode: Mode): number {
+  return 1;
 }
 
 export function handSize(mode: Mode): number {

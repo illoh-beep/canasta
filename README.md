@@ -25,3 +25,4 @@ npm run preview    # gebaute App lokal ansehen
 - Rote Dreien zählen minus, wenn das Team keinen Canasta hat
 - Handcanasta (in einem Zug ausmachen, bevor irgendwer ausgelegt hat): 1000 Punkte
 - Kein „Partner, darf ich ausmachen?“
+- Auch zu zweit: eine Karte ziehen, ein Canasta reicht zum Ausmachen

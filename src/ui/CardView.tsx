@@ -20,10 +20,11 @@ export function CardView({ card, faceDown, selected, small, onClick, className =
     return (
       <div className={[...classes, 'joker'].join(' ')} style={style} onClick={onClick}>
         <span className="corner">
-          ★
-          <br />J
+          <span className="jstar">★</span>
         </span>
-        <span className="pip">🃏</span>
+        <span className="pip">
+          <span className="jstar big">★</span>
+        </span>
       </div>
     );
   }

@@ -246,11 +246,11 @@ describe('Wertung', () => {
     expect(b.lastRound!.teams[0].goOutBonus).toBe(200);
   });
 
-  it('2 Spieler: zwei Canastas zum Ausmachen nötig, 2 Karten ziehen', () => {
+  it('2 Spieler: ein Canasta reicht zum Ausmachen, es wird 1 Karte gezogen', () => {
     const s = setup({ mode: 2, hand: [c(5)], melds: [canasta()] });
-    expect(err(s, { type: 'discard', cardId: s.players[0].hand[0].id })).toMatch(/zwei Canastas/);
+    expect(act(s, { type: 'discard', cardId: s.players[0].hand[0].id }).phase).toBe('roundOver');
     const d = setup({ mode: 2, phase: 'draw', hand: [c(5)] });
-    expect(act(d, { type: 'drawStock' }).players[0].hand.length).toBe(3);
+    expect(act(d, { type: 'drawStock' }).players[0].hand.length).toBe(2);
   });
 
   it('leerer Stock beendet die Runde ohne Ausmach-Bonus', () => {

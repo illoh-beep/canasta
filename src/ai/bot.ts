@@ -143,7 +143,7 @@ function choosePlay(s: GameState, pi: number, prof: Profile, rand: Rand): Action
 
   // Neue natürliche Meldungen.
   for (const g of naturalsByRank(hand).values()) {
-    if (g.length >= 3 && !team.melds.some((m) => m.rank === g[0].rank)) {
+    if (g.length >= 3 && !team.melds.some((m) => m.rank === g[0].rank) && !(hand.length <= (prof.holdTriples[s.mode] ?? -1))) {
       const a = tryMeld([{ cardIds: ids(g) }]);
       if (a) return a;
     }
@@ -301,7 +301,7 @@ function chooseDiscard(s: GameState, pi: number, prof: Profile, rand: Rand): num
     let keep = count >= 2 ? 40 + 15 * count : 0;
     if (ownTeam.melds.some((m) => m.rank === c.rank)) keep += 50;
     let danger = 0;
-    if (prof.countsCards) {
+    if (prof.countsCards[s.mode]) {
       const usable = !frozenForNp && npTeam.melds.some((m) => m.rank === c.rank);
       const knownNp = (mem.known.get(np) ?? []).filter((k) => isNatural(k) && k.rank === c.rank).length;
       const need = Math.max(0, (frozenForNp ? 2 : 1) - knownNp);

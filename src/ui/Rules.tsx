@@ -22,8 +22,8 @@ export function Rules({ onBack }: { onBack: () => void }) {
         <b>4 Spieler:</b> Du spielst mit Max gegen Lena und Jonas. Jeder bekommt 11 Karten, das Team legt gemeinsam aus.
         Zum Ausmachen braucht das Team einen Canasta.
         <br />
-        <b>2 Spieler:</b> Jeder bekommt 15 Karten und zieht 2 Karten vom Stock (wirft aber nur eine ab). Zum Ausmachen
-        braucht man zwei Canastas.
+        <b>2 Spieler:</b> Jeder bekommt 15 Karten. Auch hier wird eine Karte gezogen und ein Canasta reicht zum
+        Ausmachen.
       </p>
 
       <h2>Spielzug</h2>
