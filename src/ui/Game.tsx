@@ -194,33 +194,6 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
           ))}
         </div>
 
-        <div className="piles">
-          <div className={`pile discard ${myTurn && game.phase === 'play' && selected.length === 1 ? 'drop' : ''}`} onClick={onPileTap}>
-            {top ? (
-              <div className="pile-stack">
-                {game.discard.length > 1 && <CardView card={game.discard[game.discard.length - 2]} className="under" />}
-                <CardView card={top} className={myTurn && game.phase === 'draw' && canTakePileAtAll(game) ? 'glow-soft' : ''} />
-              </div>
-            ) : (
-              <div className="card empty" />
-            )}
-            {game.pileFrozen && (
-              <span className="frozen" title="Eingefroren">
-                ❄
-              </span>
-            )}
-            <span className="pile-count">{game.discard.length}</span>
-          </div>
-          <div className="pile stock" onClick={onStock}>
-            {game.stock.length > 0 ? (
-              <CardView faceDown className={myTurn && game.phase === 'draw' ? 'glow' : ''} />
-            ) : (
-              <div className="card empty" />
-            )}
-            <span className="stock-count">{game.stock.length}</span>
-          </div>
-        </div>
-
         <div className="boards">
           <MeldBoard
             game={game}
@@ -229,6 +202,32 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
             onBoardClick={onBoardClick}
             clickable={myTurn && game.phase === 'play' && selected.length > 0}
           />
+          <div className="piles">
+            <div className={`pile discard ${myTurn && game.phase === 'play' && selected.length === 1 ? 'drop' : ''}`} onClick={onPileTap}>
+              {top ? (
+                <div className="pile-stack">
+                  {game.discard.length > 1 && <CardView card={game.discard[game.discard.length - 2]} className="under" />}
+                  <CardView card={top} className={myTurn && game.phase === 'draw' && canTakePileAtAll(game) ? 'glow-soft' : ''} />
+                </div>
+              ) : (
+                <div className="card empty" />
+              )}
+              {game.pileFrozen && (
+                <span className="frozen" title="Eingefroren">
+                  ❄
+                </span>
+              )}
+              <span className="pile-count">{game.discard.length}</span>
+            </div>
+            <div className="pile stock" onClick={onStock}>
+              {game.stock.length > 0 ? (
+                <CardView faceDown className={myTurn && game.phase === 'draw' ? 'glow' : ''} />
+              ) : (
+                <div className="card empty" />
+              )}
+              <span className="stock-count">{game.stock.length}</span>
+            </div>
+          </div>
           <MeldBoard game={game} team={oppTeam} />
           <div className="ticker">
             {status && <div className={`status ${status.error ? 'error' : ''}`}>{status.text}</div>}
