@@ -1,0 +1,1 @@
+{"name":"Canasta","short_name":"Canasta","description":"Klassisches Canasta offline gegen den Computer","start_url":"./","display":"standalone","background_color":"#0b3d26","theme_color":"#0f5132","lang":"de","scope":"./","orientation":"any","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
