@@ -3,7 +3,7 @@ import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
 import { canTakePileAtAll, currentMinimum } from '../engine/game';
 import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
-import type { Action, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
+import type { Action, Card, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
 import { AvatarFace, BOT_AVATARS } from './avatar';
 import { CardView } from './CardView';
 
@@ -37,6 +37,16 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
   const myTurn = game.current === HUMAN && (game.phase === 'draw' || game.phase === 'play');
   const stagedIds = useMemo(() => new Set(staged.flatMap((g) => g.cardIds)), [staged]);
   const hand = useMemo(() => sortHand(me.hand.filter((c) => !stagedIds.has(c.id))), [me.hand, stagedIds]);
+  // Gleicher Rang = ein Stapel (Joker und Zweien jeweils eigener Stapel).
+  const stacks = useMemo(() => {
+    const out: Card[][] = [];
+    for (const c of hand) {
+      const last = out[out.length - 1];
+      if (last && last[0].rank === c.rank) last.push(c);
+      else out.push([c]);
+    }
+    return out;
+  }, [hand]);
   const myTeam = game.teams[me.team];
 
   function flash(text: string, error = false) {
@@ -78,9 +88,14 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
     }
   }, [game.phase, game.current, game.round]);
 
-  const toggle = (id: number) => {
+  // Gleiche Karten liegen als Stapel. Jeder Tipp wählt eine Karte mehr, ist alles gewählt, wird der Stapel abgewählt.
+  const tapStack = (group: Card[]) => {
     if (!myTurn) return;
-    setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
+    setSelected((sel) => {
+      const free = group.filter((c) => !sel.includes(c.id));
+      if (free.length === 0) return sel.filter((id) => !group.some((c) => c.id === id));
+      return [...sel, free[free.length - 1].id];
+    });
   };
 
   const onStock = async () => {
@@ -261,16 +276,33 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
                 ))}
               </div>
             )}
-            <div className={`hand ${myTurn ? 'my-turn' : ''}`} style={{ '--n': Math.max(hand.length, 2) } as React.CSSProperties}>
-              {hand.map((c) => (
-                <CardView
-                  key={c.id}
-                  card={c}
-                  selected={selected.includes(c.id)}
-                  className={fresh.has(c.id) ? 'fresh' : ''}
-                  onClick={() => toggle(c.id)}
-                />
-              ))}
+            <div className={`hand ${myTurn ? 'my-turn' : ''}`} style={{ '--n': Math.max(stacks.length, 2) } as React.CSSProperties}>
+              {stacks.map((group) => {
+                const picked = group.filter((c) => selected.includes(c.id)).length;
+                // Gewählte Karten liegen oben auf dem Stapel und heben sich ab.
+                const ordered = [...group.filter((c) => !selected.includes(c.id)), ...group.filter((c) => selected.includes(c.id))];
+                return (
+                  <div
+                    key={group[0].id}
+                    className={`stack ${picked > 0 ? 'has-selected' : ''}`}
+                    style={{ '--k': group.length } as React.CSSProperties}
+                    onClick={() => tapStack(group)}
+                  >
+                    {ordered.map((c, i) => (
+                      <CardView
+                        key={c.id}
+                        card={c}
+                        selected={selected.includes(c.id)}
+                        className={`${fresh.has(c.id) ? 'fresh' : ''} clickable`}
+                        style={{ '--i': group.length - 1 - i } as React.CSSProperties}
+                      />
+                    ))}
+                    {group.length > 1 && (
+                      <span className="stack-count">{picked > 0 ? `${picked}/${group.length}` : group.length}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
           <div className="actions">

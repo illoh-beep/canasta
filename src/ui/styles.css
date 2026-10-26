@@ -561,9 +561,50 @@ button.alt {
   padding-top: calc(var(--hw) * 0.32);
   margin-bottom: 0;
 }
-.hand .card + .card {
-  /* Karten rücken zusammen, je mehr man auf der Hand hat */
-  margin-left: clamp(calc(var(--hw) * -0.8), calc((100% - var(--hw)) / (var(--n) - 1) - var(--hw)), calc(var(--hw) * -0.38));
+.hand {
+  align-items: flex-end;
+}
+.hand .stack + .stack {
+  /* Stapel rücken zusammen, je mehr verschiedene Karten man auf der Hand hat */
+  margin-left: clamp(calc(var(--hw) * -0.8), calc((100% - var(--hw)) / (var(--n) - 1) - var(--hw)), calc(var(--hw) * -0.3));
+}
+.stack {
+  --step: calc(var(--hw) * 0.17);
+  position: relative;
+  flex: none;
+  width: var(--hw);
+  height: calc(var(--hw) * 1.42 + (var(--k) - 1) * var(--step));
+  cursor: pointer;
+}
+.stack .card {
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--i) * var(--step));
+}
+.stack-count {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  background: radial-gradient(circle, #ffb54d, var(--orange));
+  border: 2px solid #fff3dc;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.stack.has-selected .stack-count {
+  background: linear-gradient(180deg, #ffe08a, var(--gold-dark));
+  color: #3b2600;
+  top: calc(var(--hw) * -0.3 - 9px);
 }
 .actions {
   display: flex;
