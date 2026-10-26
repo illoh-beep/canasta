@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { newGame } from '../engine/game';
 import type { Difficulty, GameState, Mode } from '../engine/types';
 import { loadGame, loadSettings, loadStats, recordResult, saveGame, saveSettings, type Settings } from '../storage';
+import { AvatarEditor } from './AvatarEditor';
+import { AvatarFace, BOT_AVATARS, loadAvatar } from './avatar';
 import { Game } from './Game';
 import { Online } from './Online';
 import { useEngine } from './useEngine';
 import { Rules } from './Rules';
 
-type Screen = 'menu' | 'game' | 'rules' | 'online';
+type Screen = 'menu' | 'game' | 'rules' | 'online' | 'avatar';
 
 const initialJoin = new URLSearchParams(location.search).get('join');
 
@@ -32,7 +34,8 @@ export function App() {
   };
 
   const start = () => {
-    const g = newGame({ mode: settings.mode, difficulty: settings.difficulty, targetScore: settings.targetScore });
+    const avatars = [loadAvatar(), ...BOT_AVATARS.slice(1, settings.mode)];
+    const g = newGame({ mode: settings.mode, difficulty: settings.difficulty, targetScore: settings.targetScore, avatars });
     saveGame(g);
     setGame(g);
     setGameKey((k) => k + 1);
@@ -55,6 +58,7 @@ export function App() {
   }
   if (screen === 'online') return <Online settings={settings} joinCode={joinCode} onExit={leaveOnline} />;
   if (screen === 'rules') return <Rules onBack={() => setScreen('menu')} />;
+  if (screen === 'avatar') return <AvatarEditor onDone={() => setScreen('menu')} />;
 
   const stats = loadStats();
   return (
@@ -63,6 +67,16 @@ export function App() {
         <span className="suit red">♥</span> Canasta <span className="suit">♠</span>
       </h1>
       <p className="tagline">Klassisches Canasta – offline gegen den Computer</p>
+
+      <button className="me-card" onClick={() => setScreen('avatar')}>
+        <span className="me-face">
+          <AvatarFace config={loadAvatar()} />
+        </span>
+        <span>
+          <b>Mein Charakter</b>
+          <small>Hüte, Frisuren, Bärte … zusammenstellen</small>
+        </span>
+      </button>
 
       {game && (
         <button className="big" onClick={() => setScreen('game')}>
@@ -158,5 +172,11 @@ function LocalGame({
     }
     saveGame(next.phase === 'gameOver' ? null : next);
   });
-  return <Game game={game} act={act} onExit={onExit} onNewGame={onNewGame} />;
+  // Der eigene Charakter wird immer aktuell angezeigt, auch in älteren Spielständen.
+  const view = useMemo(() => {
+    const v = { ...game, players: [...game.players] };
+    v.players[0] = { ...v.players[0], avatar: loadAvatar() };
+    return v;
+  }, [game]);
+  return <Game game={view} act={act} onExit={onExit} onNewGame={onNewGame} />;
 }

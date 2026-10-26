@@ -1,5 +1,5 @@
 import Peer, { type DataConnection } from 'peerjs';
-import type { Action, Difficulty, GameState, Mode } from '../engine/types';
+import type { Action, AvatarConfig, Difficulty, GameState, Mode } from '../engine/types';
 import { type GuestMessage, type HostMessage, type LobbyInfo, makeView, newRoomCode, peerId } from './protocol';
 
 const BOT_NAMES: Record<Mode, string[]> = { 4: ['', 'Lena', 'Max', 'Jonas'], 2: ['', 'Lena'] };
@@ -11,6 +11,7 @@ interface Seat {
 
 interface GuestConn {
   name: string;
+  avatar?: AvatarConfig;
   conn: DataConnection | null;
 }
 
@@ -24,6 +25,9 @@ export interface HostSettings {
 export class Host {
   readonly code: string;
   readonly hostName: string;
+  readonly hostAvatar?: AvatarConfig;
+  /** Aussehen der Computer-Spieler pro Platz. */
+  botAvatars: AvatarConfig[] = [];
   settings: HostSettings;
   seats: Seat[] = [];
   started = false;
@@ -47,12 +51,14 @@ export class Host {
     peer.on('disconnected', () => peer.reconnect());
   }
 
-  static async create(hostName: string, settings: HostSettings): Promise<Host> {
+  static async create(hostName: string, settings: HostSettings, hostAvatar?: AvatarConfig, botAvatars: AvatarConfig[] = []): Promise<Host> {
     for (let attempt = 0; attempt < 4; attempt++) {
       const code = newRoomCode();
       try {
         const peer = await openPeer(peerId(code));
-        return new Host(peer, code, hostName, settings);
+        const host = new Host(peer, code, hostName, settings);
+        Object.assign(host, { hostAvatar, botAvatars });
+        return host;
       } catch (e) {
         if ((e as { type?: string }).type !== 'unavailable-id') throw e;
       }
@@ -88,8 +94,8 @@ export class Host {
     this.changed();
   }
 
-  /** Namen und Mensch/KI pro Platz für newGame. */
-  start(): { names: string[]; humans: boolean[] } {
+  /** Namen, Mensch/KI und Aussehen pro Platz für newGame. */
+  start(): { names: string[]; humans: boolean[]; avatars: (AvatarConfig | undefined)[] } {
     this.started = true;
     const names = this.seats.map((s, i) =>
       s.kind === 'host' ? this.hostName : s.kind === 'guest' ? s.guest! : `${BOT_NAMES[this.settings.mode][i]} 🤖`,
@@ -98,8 +104,9 @@ export class Host {
     for (const g of this.guests.values()) {
       if (!this.seats.some((s) => s.guest === g.name)) this.send(g, { t: 'closed', reason: 'Alle Plätze sind vergeben.' });
     }
+    const avatars = this.seats.map((_, i) => this.seatAvatar(i));
     this.changed();
-    return { names, humans };
+    return { names, humans, avatars };
   }
 
   /** Schickt jedem verbundenen Gast seine eigene Sicht. */
@@ -120,6 +127,7 @@ export class Host {
       seats: this.seats.map((s, i) => ({
         kind: s.kind,
         name: s.kind === 'host' ? this.hostName : s.kind === 'guest' ? s.guest! : `${BOT_NAMES[this.settings.mode][i]} 🤖`,
+        avatar: this.seatAvatar(i),
       })),
       waiting: this.guestNames.filter((n) => !this.seats.some((s) => s.guest === n)),
     };
@@ -141,6 +149,13 @@ export class Host {
     }
   }
 
+  private seatAvatar(i: number): AvatarConfig | undefined {
+    const s = this.seats[i];
+    if (s.kind === 'host') return this.hostAvatar;
+    if (s.kind === 'guest') return this.findGuest(s.guest!)?.avatar;
+    return this.botAvatars[i];
+  }
+
   private findGuest(name: string): GuestConn | undefined {
     return [...this.guests.values()].find((g) => g.name === name);
   }
@@ -156,7 +171,7 @@ export class Host {
   }
 
   private receive(conn: DataConnection, msg: GuestMessage) {
-    if (msg.t === 'hello') return this.hello(conn, msg.name);
+    if (msg.t === 'hello') return this.hello(conn, msg.name, msg.avatar);
     const g = this.guests.get(conn.peer);
     if (!g || msg.t !== 'action') return;
     const seat = this.seatOf(g.name);
@@ -165,7 +180,7 @@ export class Host {
     this.send(g, { t: 'result', id: msg.id, error });
   }
 
-  private hello(conn: DataConnection, rawName: string) {
+  private hello(conn: DataConnection, rawName: string, avatar?: AvatarConfig) {
     let name = (rawName || 'Gast').trim().slice(0, 14) || 'Gast';
     // Wiederverbinden: Gast mit gleichem Namen, dessen Verbindung abgerissen ist, bekommt seinen Platz zurück.
     const old = [...this.guests.entries()].find(([, g]) => g.name === name && !g.conn?.open);
@@ -177,7 +192,7 @@ export class Host {
       const taken = new Set([this.hostName, ...this.guestNames]);
       for (let k = 2; taken.has(name); k++) name = `${rawName.trim().slice(0, 12)} ${k}`;
     }
-    const g: GuestConn = { name, conn };
+    const g: GuestConn = { name, conn, avatar: avatar ?? old?.[1].avatar };
     this.guests.set(conn.peer, g);
     if (!this.started && !old) {
       // Automatisch auf den ersten freien Platz setzen (zu viert zuerst als Partner).

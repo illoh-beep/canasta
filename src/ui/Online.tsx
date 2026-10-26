@@ -6,6 +6,7 @@ import { GuestClient } from '../online/guest';
 import { Host } from '../online/host';
 import { type LobbyInfo, joinLink, makeView, normalizeCode } from '../online/protocol';
 import type { Settings } from '../storage';
+import { AvatarFace, BOT_AVATARS, loadAvatar } from './avatar';
 import { Game } from './Game';
 import { useEngine } from './useEngine';
 
@@ -74,7 +75,12 @@ export function Online({ settings, joinCode, onExit }: Props) {
     setError(null);
     setStage({ kind: 'busy', text: 'Spiel wird erstellt …' });
     try {
-      const host = await Host.create(n, { mode: settings.mode, difficulty: settings.difficulty, targetScore: settings.targetScore });
+      const host = await Host.create(
+        n,
+        { mode: settings.mode, difficulty: settings.difficulty, targetScore: settings.targetScore },
+        loadAvatar(),
+        BOT_AVATARS,
+      );
       host.onChange = rerender;
       setStage({ kind: 'host', host, game: null });
     } catch (e) {
@@ -90,7 +96,7 @@ export function Online({ settings, joinCode, onExit }: Props) {
     setError(null);
     setStage({ kind: 'busy', text: `Verbinde mit Spiel ${code} …` });
     try {
-      const guest = await GuestClient.join(code, n);
+      const guest = await GuestClient.join(code, n, loadAvatar());
       guest.onChange = rerender;
       setStage({ kind: 'guest', guest });
     } catch (e) {
@@ -114,7 +120,13 @@ export function Online({ settings, joinCode, onExit }: Props) {
         <>
           <div className="menu-card">
             <label>Dein Name</label>
-            <input className="text" value={name} maxLength={14} placeholder="z. B. Felix" onChange={(e) => setName(e.target.value)} />
+            <div className="name-row">
+              <span className="me-face small">
+                <AvatarFace config={loadAvatar()} />
+              </span>
+              <input className="text" value={name} maxLength={14} placeholder="z. B. Felix" onChange={(e) => setName(e.target.value)} />
+            </div>
+            <p className="hint">Deinen Charakter stellst du im Hauptmenü unter „Mein Charakter“ zusammen.</p>
           </div>
           <div className="menu-card">
             <label>Spiel beitreten</label>
@@ -164,6 +176,9 @@ function SeatList({ lobby, renderSeat }: { lobby: LobbyInfo; renderSeat: (i: num
     <div className="seats">
       {lobby.seats.map((s, i) => (
         <div key={i} className={`seat-row ${lobby.mode === 4 && i % 2 === 1 ? 'team-b' : 'team-a'}`}>
+          <span className="me-face tiny">
+            <AvatarFace config={s.avatar} />
+          </span>
           <span className="seat-label">{label(i)}</span>
           {renderSeat(i) ?? <span className="seat-name">{s.name}</span>}
         </div>
@@ -191,9 +206,11 @@ function HostLobby({ host, onStart }: { host: Host; onStart: (g: GameState) => v
   };
 
   const start = () => {
-    const { names, humans } = host.start();
+    const seatsInfo = host.start();
+    const { names, humans } = seatsInfo;
     const s = host.settings;
-    onStart(newGame({ mode: s.mode, difficulty: s.difficulty, targetScore: s.targetScore, names, humans }));
+    const { avatars } = seatsInfo;
+    onStart(newGame({ mode: s.mode, difficulty: s.difficulty, targetScore: s.targetScore, names, humans, avatars }));
   };
 
   return (

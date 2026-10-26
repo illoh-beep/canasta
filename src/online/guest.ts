@@ -1,6 +1,6 @@
 import type Peer from 'peerjs';
 import type { DataConnection } from 'peerjs';
-import type { Action, GameState } from '../engine/types';
+import type { Action, AvatarConfig, GameState } from '../engine/types';
 import { openPeer } from './host';
 import { type GuestMessage, type HostMessage, type LobbyInfo, peerId } from './protocol';
 
@@ -23,7 +23,7 @@ export class GuestClient {
     conn.on('error', () => this.closed('Die Verbindung zum Gastgeber wurde getrennt.'));
   }
 
-  static async join(code: string, name: string): Promise<GuestClient> {
+  static async join(code: string, name: string, avatar?: AvatarConfig): Promise<GuestClient> {
     const peer = await openPeer();
     return new Promise((resolve, reject) => {
       const conn = peer.connect(peerId(code), { reliable: true, serialization: 'json' });
@@ -37,7 +37,7 @@ export class GuestClient {
       conn.on('open', () => {
         clearTimeout(timer);
         const client = new GuestClient(peer, conn);
-        client.post({ t: 'hello', name });
+        client.post({ t: 'hello', name, avatar });
         resolve(client);
       });
     });

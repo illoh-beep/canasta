@@ -26,8 +26,23 @@ export interface TeamState {
   score: number;
 }
 
+/** Aussehen des Spielercharakters (wird nur von der Oberfläche ausgewertet). */
+export interface AvatarConfig {
+  skin: number;
+  eyes: string;
+  mouth: string;
+  hair: string;
+  hairColor: number;
+  beard: string;
+  glasses: string;
+  hat: string;
+  extra: string;
+  bg: number;
+}
+
 export interface Player {
   name: string;
+  avatar?: AvatarConfig;
   team: number;
   hand: Card[];
   isHuman: boolean;

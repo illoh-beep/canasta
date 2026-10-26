@@ -26,6 +26,7 @@ import {
 } from './rules';
 import type {
   Action,
+  AvatarConfig,
   Card,
   Difficulty,
   GameState,
@@ -51,6 +52,8 @@ export interface NewGameOptions {
   names?: string[];
   /** Online: welche Plätze von Menschen gespielt werden (Rest: KI). */
   humans?: boolean[];
+  /** Aussehen der Charaktere pro Platz. */
+  avatars?: (AvatarConfig | undefined)[];
   /** Schwierigkeit pro Platz, überschreibt difficulty (Simulation). */
   seatDifficulties?: Difficulty[];
   targetScore?: number;
@@ -70,6 +73,7 @@ export function newGame(opts: NewGameOptions): GameState {
       team: i % 2,
       hand: [],
       isHuman: opts.humans ? opts.humans[i] : i === 0 && !opts.allBots,
+      avatar: opts.avatars?.[i],
       difficulty: opts.seatDifficulties?.[i] ?? (isPartner ? opts.partnerDifficulty ?? opts.difficulty : opts.difficulty),
     };
   });

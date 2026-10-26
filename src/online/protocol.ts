@@ -1,4 +1,4 @@
-import type { Action, Card, Difficulty, GameState, Mode } from '../engine/types';
+import type { Action, AvatarConfig, Card, Difficulty, GameState, Mode } from '../engine/types';
 
 /** Präfix für PeerJS-IDs, damit unsere Codes nicht mit anderen Apps kollidieren. */
 const PEER_PREFIX = 'canasta-fg-v1-';
@@ -27,6 +27,7 @@ export type SeatKind = 'host' | 'guest' | 'bot';
 export interface LobbySeat {
   kind: SeatKind;
   name: string;
+  avatar?: AvatarConfig;
 }
 
 export interface LobbyInfo {
@@ -45,7 +46,7 @@ export type HostMessage =
   | { t: 'result'; id: number; error: string | null }
   | { t: 'closed'; reason: string };
 
-export type GuestMessage = { t: 'hello'; name: string } | { t: 'action'; id: number; action: Action };
+export type GuestMessage = { t: 'hello'; name: string; avatar?: AvatarConfig } | { t: 'action'; id: number; action: Action };
 
 const hidden = (n: number, base: number): Card[] => Array.from({ length: n }, (_, i) => ({ id: base - i, rank: 0, suit: null }));
 

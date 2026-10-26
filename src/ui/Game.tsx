@@ -4,6 +4,7 @@ import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
 import { canTakePileAtAll, currentMinimum } from '../engine/game';
 import { hasMelded, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
 import type { Action, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
+import { AvatarFace, BOT_AVATARS } from './avatar';
 import { CardView } from './CardView';
 
 interface Props {
@@ -296,7 +297,6 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
   );
 }
 
-const FACES = ['🙂', '👩🏼', '🧔🏻', '👨🏽'];
 
 function botLabel(game: GameState): string {
   const bot = game.players.find((p) => !p.isHuman);
@@ -308,7 +308,9 @@ function Avatar({ game, pi }: { game: GameState; pi: number }) {
   const ally = p.team === game.players[HUMAN].team;
   return (
     <div className={`avatar ${game.current === pi && (game.phase === 'draw' || game.phase === 'play') ? 'active' : ''}`}>
-      <div className="face">{FACES[pi]}</div>
+      <div className="face">
+        <AvatarFace config={p.avatar ?? BOT_AVATARS[pi % BOT_AVATARS.length]} />
+      </div>
       <div className={`ribbon ${ally ? 'ally' : 'enemy'}`}>{p.name}</div>
       {pi !== HUMAN && <div className="count">{p.hand.length}</div>}
     </div>
