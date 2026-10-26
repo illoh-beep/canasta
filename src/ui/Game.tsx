@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIFFICULTY_LABEL } from '../ai/difficulty';
 import { isWild, rankPlural, sortHand, sumValues } from '../engine/cards';
+import { autoGroup } from '../engine/autogroup';
 import { canTakePileAtAll, currentMinimum } from '../engine/game';
 import { hasMelded, initialMeldMinimum, isCanasta, isNaturalCanasta, isPileFrozenFor, topDiscard } from '../engine/rules';
 import type { Action, Card, GameState, Meld, MeldGroup, TeamRoundScore, TeamState } from '../engine/types';
@@ -107,14 +108,31 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
   const onPile = async () => {
     if (!myTurn) return;
     if (game.phase !== 'draw') return flash('Du hast schon gezogen.', true);
-    if (await act({ type: 'takePile', withCards: selected, extraMelds: staged })) {
+    // Passende Karten zur obersten Stapelkarte gehen mit ihr zusammen, der Rest wird als eigene Meldungen ausgelegt.
+    const top = topDiscard(game);
+    const sel = me.hand.filter((c) => selected.includes(c.id));
+    let withCards = selected;
+    let extra: MeldGroup[] = [];
+    if (top && sel.some((c) => !isWild(c) && c.rank !== top.rank)) {
+      const matching = sel.filter((c) => !isWild(c) && c.rank === top.rank);
+      const wild = matching.length < 2 && !isPileFrozenFor(game, HUMAN) ? sel.find(isWild) : undefined;
+      const withSet = [...matching, ...(wild ? [wild] : [])];
+      const rest = autoGroup(sel.filter((c) => !withSet.includes(c)), myTeam.melds);
+      if (typeof rest === 'string') return flash(rest, true);
+      withCards = withSet.map((c) => c.id);
+      extra = rest;
+    }
+    if (await act({ type: 'takePile', withCards, extraMelds: [...staged, ...extra] })) {
       setSelected([]);
       setStaged([]);
     }
   };
 
   const onMeld = async () => {
-    const groups = [...staged, ...(selected.length > 0 ? [{ cardIds: selected }] : [])];
+    // Gemischte Auswahl wird automatisch nach Rang in mehrere Meldungen aufgeteilt.
+    const auto = autoGroup(me.hand.filter((c) => selected.includes(c.id)), myTeam.melds);
+    if (typeof auto === 'string') return flash(auto, true);
+    const groups = [...staged, ...auto];
     if (groups.length === 0) return flash('Wähle zuerst Karten aus.', true);
     if (await act({ type: 'meld', groups })) {
       setSelected([]);
@@ -150,7 +168,7 @@ export function Game({ game, act: perform, onExit, onNewGame, notice }: Props) {
   if (game.phase === 'draw' || game.phase === 'play') {
     if (!myTurn) hint = `${game.players[game.current].name} ist am Zug …`;
     else if (game.phase === 'draw') hint = 'Tippe auf den Stock – oder wähle passende Karten und tippe auf den Ablagestapel.';
-    else hint = 'Karten wählen und auf dein Feld tippen zum Auslegen – eine Karte wählen und auf den Ablagestapel tippen zum Abwerfen.';
+    else hint = 'Karten wählen (auch mehrere Sorten) und auf dein Feld tippen zum Auslegen – eine Karte wählen und auf den Ablagestapel tippen zum Abwerfen.';
   }
 
   const onBoardClick = () => {

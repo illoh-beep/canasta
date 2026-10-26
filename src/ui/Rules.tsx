@@ -50,8 +50,9 @@ export function Rules({ onBack }: { onBack: () => void }) {
         </tbody>
       </table>
       <p>
-        Mehrere Meldungen für die Erstmeldung wählst du mit <b>Vormerken</b> nacheinander aus und legst sie dann mit{' '}
-        <b>Auslegen</b> gemeinsam aus.
+        Du kannst Karten verschiedener Sorten auf einmal auswählen und mit einem Tipp auf dein Feld auslegen – die App
+        teilt sie automatisch in Meldungen auf (Wildcards kommen dorthin, wo noch Karten fehlen). Für eine ganz
+        bestimmte Aufteilung kannst du einzelne Meldungen auch mit <b>Vormerken</b> zusammenstellen.
       </p>
 
       <h2>Dreien</h2>
